@@ -8,6 +8,16 @@ import {
     normalizeActionName, createDefaultUsage, createDefaultResources,
 } from '../utils/helpers.js';
 import { FREE_TIER, R2_CLASS_A_ACTIONS, R2_CLASS_B_ACTIONS, R2_FREE_ACTIONS } from '../utils/constants.js';
+import {
+    WORKERS_PAGES_QUERY,
+    buildWorkersPagesVariables,
+    D1_QUERY,
+    buildD1Variables,
+    KV_QUERY,
+    buildKvVariables,
+    R2_QUERY,
+    buildR2Variables,
+} from './graphql.js';
 
 /**
  * 发送 GraphQL 请求到 Cloudflare Analytics API。
@@ -20,277 +30,152 @@ async function sendGraphQLRequest(api, headers, query, variables) {
     });
 
     if (!res.ok) {
-        throw new Error(`GraphQL 查询失败: ${res.status}`);
+        throw new Error(`查询失败: ${res.status}`);
     }
     const result = await res.json();
-    if (result.errors) {
-        throw new Error(`GraphQL 错误: ${result.errors.map((e) => e.message).join(', ')}`);
+    if (result.errors?.length) {
+        throw new Error(result.errors.map(error => error.message).join('; '));
     }
-    return result;
+    const account = result?.data?.viewer?.accounts?.[0];
+    if (!account) {
+        throw new Error('未找到账户数据');
+    }
+    return account;
 }
 
 /**
  * 通过 Email 获取 Cloudflare Account ID。
  */
 async function getCloudflareAccountId(api, headers, email) {
-    const res = await fetch(`${api}/accounts`, { headers });
+    const res = await fetch(`${api}/accounts`, { method: 'GET', headers });
     if (!res.ok) {
-        throw new Error(`获取账户列表失败: ${res.status}`);
+        throw new Error(`账户获取失败: ${res.status}`);
     }
     const data = await res.json();
-    if (!data.success || !Array.isArray(data.result)) {
-        throw new Error('获取账户列表失败: API 返回异常');
+    if (!data?.result?.length) {
+        throw new Error('未找到账户');
     }
-    const account = data.result.find((acc) => acc.name === email);
-    if (!account) {
-        throw new Error(`未找到匹配的账户: ${email}`);
-    }
-    return account.id;
+    const idx = data.result.findIndex(
+        account => account.name?.toLowerCase().startsWith(email.toLowerCase())
+    );
+    return data.result[idx >= 0 ? idx : 0]?.id;
 }
 
 /**
  * 查询 Workers 和 Pages 的请求统计。
  */
 async function queryWorkersPagesStats(api, headers, accountId, timeWindow) {
-    const query = `
-        query ($accountTag: String!, $since: String!, $until: String!) {
-            viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                    pagesFunctionsInvocationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $since, datetime_leq: $until }) {
-                        sum { requests }
-                        dimensions { scriptName }
-                    }
-                    httpRequestsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $since, datetime_leq: $until }) {
-                        sum { requests }
-                        dimensions { clientRequestHTTPHost }
-                    }
-                }
-            }
-        }
-    `;
-    const variables = {
-        accountTag: accountId,
-        since: timeWindow.dayStartIso,
-        until: timeWindow.nowIso,
+    const variables = buildWorkersPagesVariables(accountId, timeWindow);
+    const account = await sendGraphQLRequest(api, headers, WORKERS_PAGES_QUERY, variables);
+    return {
+        pages: sumRequests(account.pagesFunctionsInvocationsAdaptiveGroups),
+        workers: sumRequests(account.workersInvocationsAdaptive),
     };
-
-    const result = await sendGraphQLRequest(api, headers, query, variables);
-    const accounts = result?.data?.viewer?.accounts || [];
-    const account = accounts[0] || {};
-
-    const pagesGroups = account.pagesFunctionsInvocationsAdaptiveGroups || [];
-    const workersGroups = account.httpRequestsAdaptiveGroups || [];
-
-    const pages = sumRequests(pagesGroups);
-    const workers = sumRequests(workersGroups);
-
-    return { pages, workers };
 }
 
 /**
  * 查询 D1 统计。
  */
 async function queryD1Stats(api, headers, accountId, timeWindow) {
-    const query = `
-        query ($accountTag: String!, $since: String!, $until: String!) {
-            viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                    d1AnalyticsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $since, datetime_leq: $until }) {
-                        sum { rowsRead rowsWritten }
-                        dimensions { databaseId }
-                    }
-                    d1Databases {
-                        databaseId
-                        databaseSize
-                    }
-                }
-            }
-        }
-    `;
-    const variables = {
-        accountTag: accountId,
-        since: timeWindow.dayStartIso,
-        until: timeWindow.nowIso,
-    };
+    const variables = buildD1Variables(accountId, timeWindow);
+    const account = await sendGraphQLRequest(api, headers, D1_QUERY, variables);
 
-    const result = await sendGraphQLRequest(api, headers, query, variables);
-    const accounts = result?.data?.viewer?.accounts || [];
-    const account = accounts[0] || {};
+    const d1 = createDefaultResources().d1;
 
-    const groups = account.d1AnalyticsAdaptiveGroups || [];
-    const databases = account.d1Databases || [];
+    for (const group of account.d1AnalyticsAdaptiveGroups || []) {
+        d1.rowsRead += toNumber(group?.sum?.rowsRead);
+        d1.rowsWritten += toNumber(group?.sum?.rowsWritten);
+        d1.readQueries += toNumber(group?.sum?.readQueries);
+        d1.writeQueries += toNumber(group?.sum?.writeQueries);
+    }
 
-    const latestGroups = selectLatestGroups(groups, 'databaseId', '');
-    const rowsRead = latestGroups.reduce((sum, g) => sum + toNumber(g?.sum?.rowsRead), 0);
-    const rowsWritten = latestGroups.reduce((sum, g) => sum + toNumber(g?.sum?.rowsWritten), 0);
-    const readQueries = latestGroups.length;
+    const storageGroups = selectLatestGroups(account.d1StorageAdaptiveGroups, 'databaseId', 'date');
+    d1.databases = storageGroups.length;
+    d1.storageBytes = storageGroups.reduce(
+        (total, group) => total + toNumber(group?.max?.databaseSizeBytes), 0
+    );
 
-    const databasesCount = databases.length;
-    const storageBytes = databases.reduce((sum, db) => sum + toNumber(db?.databaseSize), 0);
-
-    return {
-        rowsRead,
-        rowsReadLimit: FREE_TIER.d1RowsReadDaily,
-        rowsWritten,
-        rowsWrittenLimit: FREE_TIER.d1RowsWrittenDaily,
-        readQueries,
-        writeQueries: 0,
-        storageBytes,
-        storageLimitBytes: FREE_TIER.d1StorageBytes,
-        databases: databasesCount,
-        period: 'day',
-    };
+    return d1;
 }
 
 /**
  * 查询 KV 统计。
  */
 async function queryKVStats(api, headers, accountId, timeWindow) {
-    const query = `
-        query ($accountTag: String!, $since: String!, $until: String!) {
-            viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                    workersKVRequestsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $since, datetime_leq: $until }) {
-                        sum { requests }
-                        dimensions { namespaceId, action }
-                    }
-                    workersKVNamespaces {
-                        namespaceId
-                        keys
-                        namespaceStorageBytes
-                    }
-                }
-            }
-        }
-    `;
-    const variables = {
-        accountTag: accountId,
-        since: timeWindow.dayStartIso,
-        until: timeWindow.nowIso,
-    };
+    const variables = buildKvVariables(accountId, timeWindow);
+    const account = await sendGraphQLRequest(api, headers, KV_QUERY, variables);
 
-    const result = await sendGraphQLRequest(api, headers, query, variables);
-    const accounts = result?.data?.viewer?.accounts || [];
-    const account = accounts[0] || {};
+    const kv = createDefaultResources().kv;
 
-    const groups = account.workersKVRequestsAdaptiveGroups || [];
-    const namespaces = account.workersKVNamespaces || [];
-
-    let reads = 0;
-    let writes = 0;
-    let deletes = 0;
-    let lists = 0;
-    let operations = 0;
-
-    for (const group of groups) {
-        const action = normalizeActionName(group?.dimensions?.action || '');
+    for (const group of account.kvOperationsAdaptiveGroups || []) {
         const requests = toNumber(group?.sum?.requests);
-        operations += requests;
-        if (action.includes('read') || action.includes('get')) {
-            reads += requests;
-        } else if (action.includes('write') || action.includes('put')) {
-            writes += requests;
-        } else if (action.includes('delete')) {
-            deletes += requests;
-        } else if (action.includes('list')) {
-            lists += requests;
+        const actionType = String(group?.dimensions?.actionType || '').toLowerCase();
+        kv.operations += requests;
+
+        if (actionType.includes('read')) {
+            kv.reads += requests;
+        } else if (actionType.includes('write')) {
+            kv.writes += requests;
+        } else if (actionType.includes('delete')) {
+            kv.deletes += requests;
+        } else if (actionType.includes('list')) {
+            kv.lists += requests;
         }
     }
 
-    const keys = namespaces.reduce((sum, ns) => sum + toNumber(ns?.keys), 0);
-    const storageBytes = namespaces.reduce((sum, ns) => sum + toNumber(ns?.namespaceStorageBytes), 0);
+    const storageGroups = selectLatestGroups(account.kvStorageAdaptiveGroups, 'namespaceId', 'date');
+    kv.namespaces = storageGroups.length;
+    kv.keys = storageGroups.reduce(
+        (total, group) => total + toNumber(group?.max?.keyCount), 0
+    );
+    kv.storageBytes = storageGroups.reduce(
+        (total, group) => total + toNumber(group?.max?.byteCount), 0
+    );
 
-    return {
-        reads,
-        readsLimit: FREE_TIER.kvReadsDaily,
-        writes,
-        writesLimit: FREE_TIER.kvWritesDaily,
-        deletes,
-        deletesLimit: FREE_TIER.kvDeletesDaily,
-        lists,
-        listsLimit: FREE_TIER.kvListsDaily,
-        operations,
-        storageBytes,
-        storageLimitBytes: FREE_TIER.kvStorageBytes,
-        keys,
-        namespaces: namespaces.length,
-        period: 'day',
-    };
+    return kv;
 }
 
 /**
  * 查询 R2 统计。
  */
 async function queryR2Stats(api, headers, accountId, timeWindow) {
-    const query = `
-        query ($accountTag: String!, $since: String!, $until: String!) {
-            viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                    r2OperationsAdaptiveGroups(limit: 10000, filter: { datetime_geq: $since, datetime_leq: $until }) {
-                        sum { requests }
-                        dimensions { action, bucketName }
-                    }
-                    r2Buckets {
-                        bucketName
-                        bucketObjectCount
-                        bucketStorageBytes
-                    }
-                }
-            }
+    const variables = buildR2Variables(accountId, timeWindow);
+    const account = await sendGraphQLRequest(api, headers, R2_QUERY, variables);
+
+    const r2 = createDefaultResources().r2;
+
+    for (const group of account.r2OperationsAdaptiveGroups || []) {
+        const status = String(group?.dimensions?.actionStatus || 'success').toLowerCase();
+        if (status && status !== 'success') {
+            continue;
         }
-    `;
-    const variables = {
-        accountTag: accountId,
-        since: timeWindow.monthStartIso,
-        until: timeWindow.nowIso,
-    };
 
-    const result = await sendGraphQLRequest(api, headers, query, variables);
-    const accounts = result?.data?.viewer?.accounts || [];
-    const account = accounts[0] || {};
-
-    const groups = account.r2OperationsAdaptiveGroups || [];
-    const buckets = account.r2Buckets || [];
-
-    let classA = 0;
-    let classB = 0;
-    let freeCount = 0;
-    let other = 0;
-    let operations = 0;
-
-    for (const group of groups) {
-        const action = normalizeActionName(group?.dimensions?.action || '');
         const requests = toNumber(group?.sum?.requests);
-        operations += requests;
+        const action = normalizeActionName(group?.dimensions?.actionType);
+        r2.operations += requests;
 
         if (R2_CLASS_A_ACTIONS.has(action)) {
-            classA += requests;
+            r2.classA += requests;
         } else if (R2_CLASS_B_ACTIONS.has(action)) {
-            classB += requests;
+            r2.classB += requests;
         } else if (R2_FREE_ACTIONS.has(action)) {
-            freeCount += requests;
+            r2.free += requests;
         } else {
-            other += requests;
+            r2.other += requests;
         }
     }
 
-    const objects = buckets.reduce((sum, b) => sum + toNumber(b?.bucketObjectCount), 0);
-    const storageBytes = buckets.reduce((sum, b) => sum + toNumber(b?.bucketStorageBytes), 0);
+    const storageGroups = selectLatestGroups(account.r2StorageAdaptiveGroups, 'bucketName', 'datetime');
+    r2.buckets = storageGroups.length;
+    r2.objects = storageGroups.reduce(
+        (total, group) => total + toNumber(group?.max?.objectCount), 0
+    );
+    r2.storageBytes = storageGroups.reduce(
+        (total, group) => total + toNumber(group?.max?.payloadSize)
+            + toNumber(group?.max?.metadataSize), 0
+    );
 
-    return {
-        classA,
-        classALimit: FREE_TIER.r2ClassAMonthly,
-        classB,
-        classBLimit: FREE_TIER.r2ClassBMonthly,
-        free: freeCount,
-        other,
-        operations,
-        storageBytes,
-        storageLimitBytes: FREE_TIER.r2StorageBytes,
-        objects,
-        buckets: buckets.length,
-        period: 'month',
-    };
+    return r2;
 }
 
 /**
@@ -316,7 +201,7 @@ async function getCloudflareUsage(email, globalApiKey, accountId, apiToken) {
         }
 
         const timeWindow = getStatsTimeWindow();
-        const usage = createDefaultUsage(true, '成功更新免费额度使用数据');
+        const usage = createDefaultUsage(true, '✅ 成功更新免费额度使用数据');
         const core = await queryWorkersPagesStats(api, headers, accountId, timeWindow);
 
         usage.pages = core.pages;
@@ -355,7 +240,7 @@ async function getCloudflareUsage(email, globalApiKey, accountId, apiToken) {
         return usage;
     } catch (error) {
         console.error('获取使用量错误:', error.message);
-        fallback.msg = '获取使用量失败: ' + error.message;
+        fallback.msg = '❌ 获取使用量失败: ' + error.message;
         return fallback;
     }
 }
