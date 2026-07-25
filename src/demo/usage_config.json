@@ -1,0 +1,250 @@
+[
+  {
+    "ID": 0,
+    "Name": "EDT",
+    "Email": null,
+    "GlobalAPIKey": null,
+    "AccountID": "b4fec5ee144b8cc794e29c7978e14d23",
+    "APIToken": "demo-token-placeholder",
+    "UpdateTime": 1767972698819,
+    "LastCheckTime": 1767972698819,
+    "Usage": {
+      "success": true,
+      "pages": 10900,
+      "workers": 9670,
+      "total": 20570,
+      "max": 100000,
+      "resources": {
+        "d1": {
+          "rowsRead": 86000,
+          "rowsReadLimit": 5000000,
+          "rowsWritten": 500,
+          "rowsWrittenLimit": 100000,
+          "readQueries": 2100,
+          "writeQueries": 80,
+          "storageBytes": 12582912,
+          "storageLimitBytes": 5368709120,
+          "databases": 1,
+          "period": "day"
+        },
+        "kv": {
+          "reads": 10200,
+          "readsLimit": 100000,
+          "writes": 12,
+          "writesLimit": 1000,
+          "deletes": 0,
+          "deletesLimit": 1000,
+          "lists": 2,
+          "listsLimit": 1000,
+          "operations": 10214,
+          "storageBytes": 3145728,
+          "storageLimitBytes": 1073741824,
+          "keys": 140,
+          "namespaces": 2,
+          "period": "day"
+        },
+        "r2": {
+          "classA": 1600,
+          "classALimit": 1000000,
+          "classB": 52000,
+          "classBLimit": 10000000,
+          "free": 80,
+          "other": 0,
+          "operations": 53680,
+          "storageBytes": 167772160,
+          "storageLimitBytes": 10737418240,
+          "objects": 1100,
+          "buckets": 1,
+          "period": "month"
+        }
+      }
+    },
+    "PanelURL": "https://edt-pages.github.io/admin"
+  },
+  {
+    "ID": 1,
+    "Name": "示例账号2",
+    "Email": null,
+    "GlobalAPIKey": null,
+    "AccountID": "b1cfec5ee144b8cc794e29c7978e14d3e",
+    "APIToken": "pXq***********************************z8",
+    "UpdateTime": 1767972698820,
+    "LastCheckTime": 1767972698820,
+    "Usage": {
+      "success": true,
+      "pages": 4500,
+      "workers": 3200,
+      "total": 7700,
+      "max": 100000,
+      "resources": {
+        "d1": {
+          "rowsRead": 34000,
+          "rowsReadLimit": 5000000,
+          "rowsWritten": 300,
+          "rowsWrittenLimit": 100000,
+          "readQueries": 1100,
+          "writeQueries": 40,
+          "storageBytes": 6291456,
+          "storageLimitBytes": 5368709120,
+          "databases": 1,
+          "period": "day"
+        },
+        "kv": {
+          "reads": 5400,
+          "readsLimit": 100000,
+          "writes": 6,
+          "writesLimit": 1000,
+          "deletes": 0,
+          "deletesLimit": 1000,
+          "lists": 1,
+          "listsLimit": 1000,
+          "operations": 5407,
+          "storageBytes": 2097152,
+          "storageLimitBytes": 1073741824,
+          "keys": 90,
+          "namespaces": 1,
+          "period": "day"
+        },
+        "r2": {
+          "classA": 800,
+          "classALimit": 1000000,
+          "classB": 34000,
+          "classBLimit": 10000000,
+          "free": 40,
+          "other": 0,
+          "operations": 34840,
+          "storageBytes": 100663296,
+          "storageLimitBytes": 10737418240,
+          "objects": 700,
+          "buckets": 1,
+          "period": "month"
+        }
+      }
+    },
+    "PanelURL": null
+  },
+  {
+    "ID": 2,
+    "Name": "生产主站",
+    "Email": null,
+    "GlobalAPIKey": null,
+    "AccountID": "2a9fec5ee144b8cc794e29c7978e147f",
+    "APIToken": "jWk***********************************m4",
+    "UpdateTime": 1767972698821,
+    "LastCheckTime": 1767972698821,
+    "Usage": {
+      "success": true,
+      "pages": 89200,
+      "workers": 76500,
+      "total": 165700,
+      "max": 100000,
+      "resources": {
+        "d1": {
+          "rowsRead": 4200000,
+          "rowsReadLimit": 5000000,
+          "rowsWritten": 98000,
+          "rowsWrittenLimit": 100000,
+          "readQueries": 8500,
+          "writeQueries": 320,
+          "storageBytes": 4294967296,
+          "storageLimitBytes": 5368709120,
+          "databases": 2,
+          "period": "day"
+        },
+        "kv": {
+          "reads": 92000,
+          "readsLimit": 100000,
+          "writes": 890,
+          "writesLimit": 1000,
+          "deletes": 45,
+          "deletesLimit": 1000,
+          "lists": 320,
+          "listsLimit": 1000,
+          "operations": 93255,
+          "storageBytes": 838860800,
+          "storageLimitBytes": 1073741824,
+          "keys": 5600,
+          "namespaces": 3,
+          "period": "day"
+        },
+        "r2": {
+          "classA": 890000,
+          "classALimit": 1000000,
+          "classB": 8600000,
+          "classBLimit": 10000000,
+          "free": 45000,
+          "other": 1200,
+          "operations": 9536200,
+          "storageBytes": 8589934592,
+          "storageLimitBytes": 10737418240,
+          "objects": 48000,
+          "buckets": 3,
+          "period": "month"
+        }
+      }
+    },
+    "PanelURL": "https://dashboard.example.com"
+  },
+  {
+    "ID": 3,
+    "Name": "API网关",
+    "Email": null,
+    "GlobalAPIKey": null,
+    "AccountID": "3b8fec5ee144b8cc794e29c7978e141d",
+    "APIToken": "tYu***********************************k9",
+    "UpdateTime": 1767972698822,
+    "LastCheckTime": 1767972698822,
+    "Usage": {
+      "success": true,
+      "pages": 1200,
+      "workers": 61000,
+      "total": 62200,
+      "max": 100000,
+      "resources": {
+        "d1": {
+          "rowsRead": 1800000,
+          "rowsReadLimit": 5000000,
+          "rowsWritten": 56000,
+          "rowsWrittenLimit": 100000,
+          "readQueries": 4200,
+          "writeQueries": 160,
+          "storageBytes": 2147483648,
+          "storageLimitBytes": 5368709120,
+          "databases": 1,
+          "period": "day"
+        },
+        "kv": {
+          "reads": 65000,
+          "readsLimit": 100000,
+          "writes": 520,
+          "writesLimit": 1000,
+          "deletes": 28,
+          "deletesLimit": 1000,
+          "lists": 180,
+          "listsLimit": 1000,
+          "operations": 65728,
+          "storageBytes": 524288000,
+          "storageLimitBytes": 1073741824,
+          "keys": 3200,
+          "namespaces": 2,
+          "period": "day"
+        },
+        "r2": {
+          "classA": 340000,
+          "classALimit": 1000000,
+          "classB": 5500000,
+          "classBLimit": 10000000,
+          "free": 22000,
+          "other": 800,
+          "operations": 5862800,
+          "storageBytes": 4294967296,
+          "storageLimitBytes": 10737418240,
+          "objects": 22000,
+          "buckets": 2,
+          "period": "month"
+        }
+      }
+    },
+    "PanelURL": null
+  }
+]

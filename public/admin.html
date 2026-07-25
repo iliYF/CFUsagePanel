@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Usage Panel</title>
+    <link rel="icon" href="https://cf-assets.www.cloudflare.com/dzlvafdwdttg/5uhbWfhjepEoUiM9phzhgJ/9658369030266cde9e35a3c5d4e4beb2/cloud-upload.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="admin-page">
+    <!-- 顶部导航 -->
+    <div class="top-nav">
+        <button class="nav-btn" onclick="toggleTheme()" id="theme-toggle">
+            <svg id="sun-icon" style="display:none" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="18.36" x2="5.64" y2="19.78"></line><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line></svg>
+            <svg id="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <span id="theme-text">切换显示模式</span>
+        </button>
+        <button class="nav-btn" onclick="copyUsageAPI()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            复制 UsageAPI
+        </button>
+        <button class="nav-btn logout" onclick="logout()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            退出管理面板
+        </button>
+    </div>
+
+    <div class="container">
+        <!-- 汇总卡片 -->
+        <div class="glass-card summary-card">
+            <div class="summary-header">
+                <h1>Cloudflare 额度汇总</h1>
+                <button class="refresh-btn" onclick="forceRefresh()" id="refresh-btn" title="强制刷新所有账号数据">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="summary-content">
+                <div class="loading-wrap"><div class="loading-spinner"></div></div>
+            </div>
+        </div>
+
+        <!-- 账号管理卡片 -->
+        <div class="glass-card accounts-card">
+            <div class="module-header">
+                <h2>☁️ Cloudflare 账号管理</h2>
+                <button class="add-btn" onclick="openAddModal()">添加账号</button>
+            </div>
+            <div id="config-content">
+                <div class="loading-wrap"><div class="loading-spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 添加账号模态框 -->
+    <div id="addModal" class="modal-overlay">
+        <div class="modal">
+            <h3 id="modalTitle">添加 Cloudflare 账号</h3>
+            <div class="input-group">
+                <label>账号名称</label>
+                <input type="text" id="newName" placeholder="例如：生产环境">
+            </div>
+            <div class="input-group">
+                <label>验证方式</label>
+                <select id="authMethod" onchange="switchAuthMethod()" style="width: 100%; padding: 0.75rem 1rem; background: var(--input-bg); border: 1px solid var(--stroke); border-radius: 12px; color: var(--text-main); outline: none; cursor: pointer; appearance: none; -webkit-appearance: none;">
+                    <option value="token">Account ID + API Token</option>
+                    <option value="global">Email + Global API Key</option>
+                </select>
+            </div>
+            <div id="tokenFields">
+                <div class="input-group">
+                    <label>Account ID</label>
+                    <input type="text" id="newAccountID" placeholder="Cloudflare 账户 ID">
+                </div>
+                <div class="input-group">
+                    <label>API Token</label>
+                    <input type="password" id="newAPIToken" placeholder="包含&#34;阅读分析数据和日志&#34;权限的 API令牌">
+                </div>
+            </div>
+            <div id="globalFields" style="display:none">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="newEmail" placeholder="Cloudflare 注册邮箱">
+                </div>
+                <div class="input-group">
+                    <label>Global API Key</label>
+                    <input type="password" id="newGlobalAPIKey" placeholder="全局 API 密钥">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>面板地址</label>
+                <input type="text" id="newPanelURL" placeholder="可选：EasyPanel / EdgeTunnel 等面板地址">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeAddModal()">取消</button>
+                <button class="modal-btn confirm" id="modalSubmit" onclick="handleAddAccount()">确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

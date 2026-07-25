@@ -14,6 +14,8 @@
 
 ---
 
+[![](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/iliYF/CFUsagePanel)
+
 ## 📖 项目简介
 
 **CF-Workers-UsagePanel** 是一个基于 Cloudflare Workers 构建的免费额度统计监控面板,帮助您实时追踪和管理多个 Cloudflare 账户的 Workers、Pages、D1、Workers KV 和 R2 使用情况。
@@ -141,6 +143,72 @@
 2. **变量名称** 填写 `PASSWORD`
 3. **值** 填写你的密码(请使用强密码)
 4. 点击 **保存并部署**
+
+---
+
+
+
+### 方法二:使用 Wrangler 本地开发与部署（推荐）
+
+#### 前置条件
+
+- [Node.js](https://nodejs.org/) 20+
+- Cloudflare 账号
+
+#### 1. 克隆项目并安装依赖
+
+```bash
+git clone https://github.com/<your-username>/CF-Workers-UsagePanel.git
+cd CF-Workers-UsagePanel
+npm install
+```
+
+#### 2. 本地预览（无需真实 KV）
+
+```bash
+cp .dev.vars.example .dev.vars
+# 编辑 .dev.vars，设置 PASSWORD
+
+npx wrangler dev
+```
+
+打开 http://localhost:8787 即可访问。
+
+> **说明**：`npx wrangler dev` 默认使用 Miniflare 在本地模拟 KV，数据保存在 `.wrangler/state/`，因此本地开发阶段**不需要创建真实 KV 命名空间**，`wrangler.jsonc` 里的占位符 ID 不影响本地预览。
+
+#### 3. 创建 KV 命名空间（仅部署前需要）
+
+准备部署到 Cloudflare 时，再创建真实 KV：
+
+```bash
+# 生产环境 KV
+npx wrangler kv namespace create KV
+# 预览环境 KV（可选，用于 wrangler dev --remote）
+npx wrangler kv namespace create KV --preview
+```
+
+将返回的 `id` 和 `preview_id` 分别填入 `wrangler.jsonc` 中 `kv_namespaces[0].id` 和 `kv_namespaces[0].preview_id`。
+
+#### 4. 部署上线
+
+```bash
+# 生产环境密码请以 secret 形式设置，避免明文提交
+npx wrangler secret put PASSWORD
+
+# 部署
+npx wrangler deploy
+```
+
+#### 5. CI 自动部署
+
+在仓库 **Settings → Secrets and variables → Actions** 中添加：
+
+- `CLOUDFLARE_API_TOKEN`：具有 `Cloudflare Workers:Edit`、`Workers KV Storage:Edit`、`Account Settings:Read` 权限的 API Token。
+- `CLOUDFLARE_ACCOUNT_ID`：你的 Cloudflare 账户 ID。
+
+推送代码到 `main` 分支后将自动触发 `wrangler deploy`。
+
+> **Cron 说明**：`wrangler.jsonc` 中已默认注册 `*/20 * * * *`（每 20 分钟）。如果你修改了 `ACCOUNT_CHECK_INTERVAL_MINUTES`，请同步调整 cron 表达式。
 
 ---
 
@@ -453,7 +521,12 @@ curl https://your-worker.workers.dev/usage.json?token=ADMIN_TOKEN
 - 在 Worker 设置中添加 Cron 触发器
 - 例如: `0 */6 * * *` (每 6 小时)
 
-**方法二:手动刷新**
+**方法二:修改 wrangler.jsonc（推荐）**
+- 编辑 `wrangler.jsonc` 中的 `triggers.crons`
+- 例如: `"0 */6 * * *"` (每 6 小时)
+- 修改后运行 `npx wrangler deploy` 重新部署
+
+**方法三:手动刷新**
 - 进入管理面板点击 **🔄 手动刷新**
 
 ### 6. 免费额度数据不准确?
