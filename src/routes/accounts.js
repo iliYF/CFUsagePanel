@@ -1,8 +1,9 @@
 /**
  * 账号管理路由处理器。
- * POST /api/accounts/add   — 添加 CF 账号
- * POST /api/accounts/del   — 删除 CF 账号
- * POST /api/accounts/check — 检查单个账号用量
+ * POST /api/accounts/add    — 添加 CF 账号
+ * POST /api/accounts/del    — 删除 CF 账号
+ * POST /api/accounts/check  — 检查单个账号用量
+ * POST /api/accounts/verify — 验证 API Token 可用性（服务端代理，避免 CORS）
  */
 
 import { jsonResponse, normalizeAccountUsage } from '../utils/helpers.js';
@@ -243,4 +244,85 @@ async function updateAccount(context) {
     }
 }
 
-export { addAccount, deleteAccount, checkAccount, updateAccount };
+/**
+ * POST /api/accounts/verify
+ * 验证 API Token 可用性（服务端代理，避免 CORS）。
+ * Body: { AccountID, APIToken }
+ */
+async function verifyAccountToken(context) {
+    const { request, isDemo } = context;
+
+    if (isDemo) {
+        return jsonResponse({ success: false, msg: '预览模式下，无法进行此操作' }, 403);
+    }
+
+    if (request.method !== 'POST') {
+        return jsonResponse({ success: false, msg: 'Method Not Allowed' }, 405);
+    }
+
+    try {
+        const body = await request.json();
+        const accountID = body.AccountID || '';
+        const apiToken = body.APIToken || '';
+
+        if (!accountID || !apiToken) {
+            return jsonResponse({ success: false, msg: '请提供 AccountID 和 APIToken' }, 400);
+        }
+
+        const resp = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${accountID}/tokens/verify`,
+            { headers: { 'Authorization': 'Bearer ' + apiToken } }
+        );
+        const data = await resp.json();
+
+        return jsonResponse(data);
+    } catch (error) {
+        return jsonResponse({ success: false, msg: '验证请求失败: ' + error.message }, 500);
+    }
+}
+
+/**
+ * POST /api/accounts/token
+ * 获取指定账号的明文敏感字段（APIToken / GlobalAPIKey）。
+ * 仅管理员可用，用于编辑时查看已存储的 Token。
+ * Body: { ID: number }
+ */
+async function getAccountToken(context) {
+    const { request, env, isDemo } = context;
+
+    if (isDemo) {
+        return jsonResponse({ success: false, msg: '预览模式下不支持此操作' }, 403);
+    }
+
+    if (request.method !== 'POST') {
+        return jsonResponse({ success: false, msg: 'Method Not Allowed' }, 405);
+    }
+
+    try {
+        const body = await request.json();
+        const accountId = body.ID;
+
+        if (accountId === undefined || accountId === null) {
+            return jsonResponse({ success: false, msg: '请提供账号ID' }, 400);
+        }
+
+        const configJson = (await env.KV.get('usage_config.json', { type: 'json' })) || [];
+        const account = configJson.find((item) => item.ID === accountId);
+
+        if (!account) {
+            return jsonResponse({ success: false, msg: '未找到该账号' }, 404);
+        }
+
+        return jsonResponse({
+            success: true,
+            data: {
+                APIToken: account.APIToken || null,
+                GlobalAPIKey: account.GlobalAPIKey || null,
+            },
+        });
+    } catch (error) {
+        return jsonResponse({ success: false, msg: '获取失败: ' + error.message }, 500);
+    }
+}
+
+export { addAccount, deleteAccount, checkAccount, updateAccount, verifyAccountToken, getAccountToken };

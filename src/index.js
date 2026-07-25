@@ -12,13 +12,14 @@ import {
     generateAdminToken,
     generateAdminCookie,
     generateTempToken,
+    generateFullToken,
     verifyAdminCookie,
 } from './utils/auth.js';
 import { handleScheduled } from './scheduled.js';
 
 import { getUsage } from './routes/usage.js';
 import { getToken, login, logout, authStatus } from './routes/auth.js';
-import { addAccount, deleteAccount, checkAccount, updateAccount } from './routes/accounts.js';
+import { addAccount, deleteAccount, checkAccount, updateAccount, verifyAccountToken, getAccountToken } from './routes/accounts.js';
 import { getConfig, refreshAdminUsage } from './routes/admin.js';
 
 /**
@@ -38,6 +39,8 @@ const ROUTES = [
     { method: 'POST', path: '/api/accounts/del', handler: deleteAccount, auth: 'admin' },
     { method: 'POST', path: '/api/accounts/update', handler: updateAccount, auth: 'admin' },
     { method: 'POST', path: '/api/accounts/check', handler: checkAccount, auth: 'admin' },
+    { method: 'POST', path: '/api/accounts/verify', handler: verifyAccountToken, auth: 'admin' },
+    { method: 'POST', path: '/api/accounts/token', handler: getAccountToken, auth: 'admin' },
     { method: 'GET', path: '/api/admin/config', handler: getConfig, auth: 'admin' },
     { method: 'GET', path: '/api/admin/usage', handler: refreshAdminUsage, auth: 'admin' },
     { method: 'POST', path: '/api/admin/usage', handler: refreshAdminUsage, auth: 'admin' },
@@ -79,6 +82,7 @@ export default {
         const adminToken = await generateAdminToken(credentials.password, credentials.username);
         const adminCookie = await generateAdminCookie(adminToken, userAgent);
         const tempToken = await generateTempToken(url.hostname, adminToken, userAgent);
+        const fullToken = await generateFullToken(adminToken);
 
         // 验证密码是否配置
         if (!credentials.password) {
@@ -105,6 +109,7 @@ export default {
             adminToken,
             adminCookie,
             tempToken,
+            fullToken,
             credentials,
             isDemo: credentials.isDemo,
         };

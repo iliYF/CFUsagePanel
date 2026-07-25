@@ -82,8 +82,17 @@
                     <input type="text" id="newAccountID" placeholder="Cloudflare 账户 ID">
                 </div>
                 <div class="input-group">
-                    <label>API Token</label>
-                    <input type="password" id="newAPIToken" placeholder="包含&#34;阅读分析数据和日志&#34;权限的 API令牌">
+                    <label>API Token <button type="button" class="reveal-token-btn" id="revealTokenBtn" onclick="revealToken()" style="display:none;">查看</button></label>
+                    <div class="password-wrap">
+                        <input type="password" id="newAPIToken" placeholder="包含&#34;阅读分析数据和日志&#34;权限的 API令牌" style="width: 100%; padding: 0.75rem 1rem; padding-right: 2.75rem; background: var(--input-bg); border: 1px solid var(--stroke); border-radius: 12px; color: var(--text-main); outline: none; font-family: 'Outfit', sans-serif; font-size: 0.9rem;">
+                        <button type="button" class="toggle-password" id="toggleTokenBtn" onclick="toggleAPIToken()" aria-label="显示Token">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="verify-row">
+                    <button class="modal-btn verify" id="verifyBtn" onclick="verifyToken()">可用性验证</button>
+                    <span id="verifyResult" class="verify-result"></span>
                 </div>
             </div>
             <div id="globalFields" style="display:none">
@@ -92,7 +101,7 @@
                     <input type="email" id="newEmail" placeholder="Cloudflare 注册邮箱">
                 </div>
                 <div class="input-group">
-                    <label>Global API Key</label>
+                    <label>Global API Key <button type="button" class="reveal-token-btn" id="revealGlobalKeyBtn" onclick="revealToken()" style="display:none;">查看</button></label>
                     <input type="password" id="newGlobalAPIKey" placeholder="全局 API 密钥">
                 </div>
             </div>

@@ -3,6 +3,14 @@
  * 账号管理、CRUD 操作、刷新控制。
  */
 
+/** 文本中间截断，超出 maxLen 显示为 "前N...后N" */
+function truncateMiddle(text, maxLen) {
+    maxLen = maxLen || 12;
+    if (!text || text.length <= maxLen) return text;
+    var keep = Math.floor((maxLen - 3) / 2);
+    return text.slice(0, keep) + '...' + text.slice(-keep);
+}
+
 /** 复制 Usage API URL **/
 function copyUsageAPI() {
     var url = 'https://' + window.location.hostname + '/api/usage?token=' + usageToken;
@@ -126,9 +134,9 @@ function renderAccountTabs(data, activeIndex) {
     html += '<div class="account-tabs">';
     for (var i = 0; i < data.length; i++) {
         var isActive = (i === active);
-        html += '<button class="account-tab' + (isActive ? ' active' : '') + '" onclick="renderAccountTabs(window._accountData, ' + i + ')">'
+        html += '<button class="account-tab' + (isActive ? ' active' : '') + '" onclick="renderAccountTabs(window._accountData, ' + i + ')" title="' + data[i].Name + '">'
             + '<span class="tab-indicator"></span>'
-            + data[i].Name
+            + truncateMiddle(data[i].Name, 12)
             + '</button>';
     }
     html += '</div>';
@@ -169,7 +177,7 @@ function renderAccountTabs(data, activeIndex) {
                             + '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
                             + '</svg></button></div>'
                     : '<div class="account-id">📧 Email: ' + (acc.Email || '') + '</div>')
-                + '<div class="account-id" style="margin-top: 4px; opacity: 0.8;">🕒 更新时间: ' + updateTime + '</div>'
+                + '<div class="account-id" style="margin-top: 8px; opacity: 0.8;">🕒 更新时间: ' + updateTime + '</div>'
             + '</div>'
             + '<button class="delete-btn" onclick="deleteAccount(' + acc.ID + ')">删除账号</button>'
         + '</div>'
@@ -211,6 +219,8 @@ function openAddModal() {
     document.getElementById('modalSubmit').textContent = '确认添加';
     document.getElementById('authMethod').value = 'token';
     switchAuthMethod();
+    document.getElementById('revealTokenBtn').style.display = 'none';
+    document.getElementById('revealGlobalKeyBtn').style.display = 'none';
 }
 
 /** 打开编辑账号模态框 **/
@@ -232,13 +242,18 @@ function openEditModal(id) {
     if (acc.AccountID && acc.APIToken) {
         document.getElementById('authMethod').value = 'token';
         document.getElementById('newAccountID').value = acc.AccountID || '';
-        document.getElementById('newAPIToken').value = acc.APIToken || '';
+        document.getElementById('newAPIToken').value = '';
+        document.getElementById('newAPIToken').placeholder = '留空则不修改，可重新输入';
     } else if (acc.Email && acc.GlobalAPIKey) {
         document.getElementById('authMethod').value = 'global';
         document.getElementById('newEmail').value = acc.Email || '';
-        document.getElementById('newGlobalAPIKey').value = acc.GlobalAPIKey || '';
+        document.getElementById('newGlobalAPIKey').value = '';
+        document.getElementById('newGlobalAPIKey').placeholder = '留空则不修改，可重新输入';
     }
     switchAuthMethod();
+    // 编辑模式下显示「查看」按钮
+    document.getElementById('revealTokenBtn').style.display = 'inline-block';
+    document.getElementById('revealGlobalKeyBtn').style.display = 'inline-block';
 }
 
 /** 切换认证方式表单 **/
@@ -248,15 +263,118 @@ function switchAuthMethod() {
     document.getElementById('globalFields').style.display = method === 'global' ? 'block' : 'none';
 }
 
+/** 获取并显示明文 Token */
+async function revealToken() {
+    var editId = document.getElementById('addModal').dataset.editId;
+    if (!editId) return;
+
+    var revealBtn = document.getElementById('revealTokenBtn');
+    revealBtn.disabled = true;
+    revealBtn.textContent = '获取中...';
+
+    try {
+        var resp = await fetch('/api/accounts/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ID: parseInt(editId) })
+        });
+        var data = await resp.json();
+
+        if (data.success && data.data) {
+            var method = document.getElementById('authMethod').value;
+            if (method === 'token' && data.data.APIToken) {
+                document.getElementById('newAPIToken').value = data.data.APIToken;
+                document.getElementById('newAPIToken').type = 'text';
+                document.getElementById('toggleTokenBtn').classList.add('active');
+            } else if (method === 'global' && data.data.GlobalAPIKey) {
+                document.getElementById('newGlobalAPIKey').value = data.data.GlobalAPIKey;
+            }
+        } else {
+            showToast('⚠️ 获取 Token 失败: ' + (data.msg || '未知错误'));
+        }
+    } catch (e) {
+        showToast('⚠️ 网络错误，请重试');
+    } finally {
+        revealBtn.disabled = false;
+        revealBtn.textContent = '查看';
+    }
+}
+
+/** 切换 API Token 可见性 */
+function toggleAPIToken() {
+    var input = document.getElementById('newAPIToken');
+    var btn = document.getElementById('toggleTokenBtn');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.classList.add('active');
+    } else {
+        input.type = 'password';
+        btn.classList.remove('active');
+    }
+}
+
 /** 关闭添加账号模态框 **/
 function closeAddModal() {
     document.getElementById('addModal').classList.remove('active');
     document.getElementById('newName').value = '';
     document.getElementById('newAccountID').value = '';
     document.getElementById('newAPIToken').value = '';
+    document.getElementById('newAPIToken').type = 'password';
+    document.getElementById('newAPIToken').placeholder = '包含"阅读分析数据和日志"权限的 API令牌';
+    document.getElementById('toggleTokenBtn').classList.remove('active');
     document.getElementById('newEmail').value = '';
     document.getElementById('newGlobalAPIKey').value = '';
+    document.getElementById('newGlobalAPIKey').placeholder = '全局 API 密钥';
     document.getElementById('newPanelURL').value = '';
+    document.getElementById('verifyResult').textContent = '';
+    document.getElementById('verifyResult').className = 'verify-result';
+    document.getElementById('revealTokenBtn').style.display = 'none';
+    document.getElementById('revealGlobalKeyBtn').style.display = 'none';
+}
+
+/** 验证 API Token 可用性 **/
+async function verifyToken() {
+    var accountID = document.getElementById('newAccountID').value.trim();
+    var apiToken = document.getElementById('newAPIToken').value.trim();
+    var btn = document.getElementById('verifyBtn');
+    var resultEl = document.getElementById('verifyResult');
+
+    if (!accountID || !apiToken) {
+        resultEl.textContent = '请先填写 Account ID 和 API Token';
+        resultEl.className = 'verify-result verify-error';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '验证中...';
+    resultEl.textContent = '';
+    resultEl.className = 'verify-result';
+
+    try {
+        var resp = await fetch('/api/accounts/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ AccountID: accountID, APIToken: apiToken })
+        });
+        var data = await resp.json();
+
+        if (data.success) {
+            var statusText = (data.result && data.result.status === 'active') ? '活跃' : (data.result && data.result.status) || '';
+            var msgText = (data.messages && data.messages[0] && data.messages[0].message) || '';
+            resultEl.textContent = '✓ ' + msgText + (statusText ? '（' + statusText + '）' : '');
+            resultEl.className = 'verify-result verify-success';
+        } else {
+            var msg = (data.errors && data.errors[0] && data.errors[0].message) || data.msg || '验证失败';
+            resultEl.textContent = '✗ ' + msg;
+            resultEl.className = 'verify-result verify-error';
+        }
+    } catch (e) {
+        resultEl.textContent = '✗ 网络错误，请重试';
+        resultEl.className = 'verify-result verify-error';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '可用性验证';
+    }
 }
 
 /** 添加/更新账号 **/
@@ -272,14 +390,14 @@ async function handleAddAccount() {
     if (method === 'token') {
         accountID = document.getElementById('newAccountID').value;
         apiToken = document.getElementById('newAPIToken').value;
-        if (!name || !accountID || !apiToken) {
+        if (!name || !accountID || (!apiToken && !isEdit)) {
             showToast('⚠️ 请填写完整信息');
             return;
         }
     } else {
         email = document.getElementById('newEmail').value;
         globalAPIKey = document.getElementById('newGlobalAPIKey').value;
-        if (!name || !email || !globalAPIKey) {
+        if (!name || !email || (!globalAPIKey && !isEdit)) {
             showToast('⚠️ 请填写完整信息');
             return;
         }
@@ -289,12 +407,17 @@ async function handleAddAccount() {
     var body = {
         Name: name,
         AccountID: accountID,
-        APIToken: apiToken,
-        Email: email,
-        GlobalAPIKey: globalAPIKey,
+        APIToken: apiToken || null,
+        Email: email || null,
+        GlobalAPIKey: globalAPIKey || null,
         PanelURL: panelURL || null,
     };
-    if (isEdit) body.ID = editId;
+    if (isEdit) {
+        body.ID = editId;
+        // 编辑模式下不发送空敏感字段，保留原值
+        if (!apiToken) delete body.APIToken;
+        if (!globalAPIKey) delete body.GlobalAPIKey;
+    }
 
     try {
         var res = await fetch(apiUrl, {

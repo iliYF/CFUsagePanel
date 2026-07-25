@@ -19,10 +19,13 @@
     <div class="container">
         <div class="glass-card">
             <header>
-                <h1>Cloudflare 额度使用统计</h1>
-                <div class="status-badge">
-                    <span class="status-dot"></span>
-                    <span id="last-update-text">加载中...</span>
+                <h1>☁️ Cloudflare 额度使用统计</h1>
+                <div class="status-row">
+                    <span id="current-time" class="time-badge time-badge-left">--:--:--</span>
+                    <div class="status-badge">
+                        <span id="last-update-text">加载中...</span>
+                        <span class="status-dot"></span>
+                    </div>
                 </div>
             </header>
 
@@ -88,8 +91,9 @@
             }
 
             try {
+                var token = getFullToken() || usageToken;
                 var start = Date.now();
-                var response = await fetch('/api/usage?token=' + usageToken + '&t=' + start);
+                var response = await fetch('/api/usage?token=' + token + '&t=' + start);
                 var data = await response.json();
                 var elapsed = Date.now() - start;
                 if (elapsed < 600) await new Promise(function (r) { setTimeout(r, 600 - elapsed); });
@@ -106,7 +110,7 @@
                 content.innerHTML =
                     '<div class="usage-section">' +
                         '<div class="usage-header">' +
-                            '<span class="label">总请求占比</span>' +
+                            '<span class="label">总配额消耗</span>' +
                             '<span class="percentage">' + percent + '%</span>' +
                         '</div>' +
                         '<div class="progress-track">' +
@@ -132,7 +136,11 @@
                             '</div>' +
                         '</div>' +
                     '</div>' +
-                    renderResourceQuotas(resources);
+                    (hasDetailAccess() ? renderResourceQuotas(resources) :
+                        '<div class="quota-summary quota-summary-locked">' +
+                            '<span class="quota-summary-title">资源额度细节</span>' +
+                            '<span class="quota-summary-meta quota-summary-meta-alert">登录后可查看</span>' +
+                        '</div>');
 
                 bindQuotaDetailsAnimations(content);
 
@@ -145,7 +153,7 @@
 
                 // 更新状态
                 var updateTime = data.UpdateTime ? new Date(data.UpdateTime).toLocaleString() : '';
-                document.getElementById('last-update-text').textContent = updateTime ? '最后更新: ' + updateTime : '实时';
+                document.getElementById('last-update-text').textContent = updateTime || '实时';
 
                 // 如果没有数据，显示登录入口
                 if (total === 0 && !data.success) {
@@ -268,6 +276,9 @@
                 });
                 var data = await response.json();
                 if (data.success) {
+                    if (data.data && data.data.fullToken) {
+                        localStorage.setItem('cfuToken', data.data.fullToken);
+                    }
                     window.location.href = '/admin.html';
                 } else {
                     errorDiv.textContent = data.msg || '登录失败';
@@ -283,9 +294,24 @@
             }
         }
 
+        // 时钟
+        function updateClock() {
+            var el = document.getElementById('current-time');
+            if (el) {
+                var d = new Date();
+                var y = d.getFullYear();
+                var m = ('0' + (d.getMonth() + 1)).slice(-2);
+                var day = ('0' + d.getDate()).slice(-2);
+                var t = d.toLocaleTimeString();
+                el.textContent = y + '-' + m + '-' + day + ' ' + t;
+            }
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
         // 启动
         fetchUsage();
-        setInterval(fetchUsage, 60000);
+        setInterval(fetchUsage, 600000);
     </script>
 </body>
 </html>

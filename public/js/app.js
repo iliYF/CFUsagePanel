@@ -48,6 +48,16 @@ function updateThemeIcons() {
     }
 }
 
+/** 获取存储的完整 Scope Token（登录后持久化） */
+function getFullToken() {
+    return localStorage.getItem('cfuToken') || '';
+}
+
+/** 检查是否有查看资源细节的权限（基于完整 Scope Token） */
+function hasDetailAccess() {
+    return getFullToken() !== '';
+}
+
 /** Toast 消息提示 **/
 function showToast(msg) {
     var toast = document.getElementById('toast');
@@ -164,17 +174,18 @@ function renderResourceQuotas(resources) {
                 '<div class="resource-note">总操作次数: ' + formatNumber(kv.operations || 0) + ' | 总 Key 数: ' + formatNumber(kv.keys || 0) + '</div>',
             ]) +
             renderQuotaGroup('D1', formatNumber(d1.databases || 0) + ' 个数据库', [
-                renderQuotaBar('读取行数（今日）', d1.rowsRead, d1.rowsReadLimit),
-                renderQuotaBar('写入行数（今日）', d1.rowsWritten, d1.rowsWrittenLimit),
+                renderQuotaBar('读取（今日）', d1.rowsRead, d1.rowsReadLimit),
+                renderQuotaBar('写入（今日）', d1.rowsWritten, d1.rowsWrittenLimit),
                 renderQuotaBar('存储大小', d1.storageBytes, d1.storageLimitBytes, formatBytes),
                 '<div class="resource-note">读取查询: ' + formatNumber(d1.readQueries || 0) + ' | 写入查询: ' + formatNumber(d1.writeQueries || 0) + '</div>',
             ]) +
             renderQuotaGroup('R2', formatNumber(r2.buckets || 0) + ' 个存储桶', [
-                renderQuotaBar('A 类操作（本月）', r2.classA, r2.classALimit),
-                renderQuotaBar('B 类操作（本月）', r2.classB, r2.classBLimit),
+                renderQuotaBar('Class A（本月）', r2.classA, r2.classALimit),
+                renderQuotaBar('Class B（本月）', r2.classB, r2.classBLimit),
                 renderQuotaBar('存储大小', r2.storageBytes, r2.storageLimitBytes, formatBytes),
                 '<div class="resource-note">免费操作: ' + formatNumber(r2.free || 0) + ' | 其他: ' + formatNumber(r2.other || 0) + ' | 总操作: ' + formatNumber(r2.operations || 0) + ' | 对象数: ' + formatNumber(r2.objects || 0) + '</div>',
             ]) +
+            '<div class="quota-period-note">D1/KV 按 UTC 自然日统计，R2 操作按本月统计；存储为最近一次指标快照。</div>' +
         '</div></div>' +
     '</details>';
 }

@@ -57,7 +57,7 @@ async function getToken(context) {
  * 管理员登录，验证 Turnstile + 账号密码后设置 Cookie。
  */
 async function login(context) {
-    const { request, env, adminCookie, credentials } = context;
+    const { request, env, adminCookie, credentials, fullToken } = context;
 
     if (request.method !== 'POST') {
         return jsonResponse({ success: false, msg: 'Method Not Allowed' }, 405);
@@ -86,7 +86,11 @@ async function login(context) {
 
         if (inputUsername === credentials.username && inputPassword === credentials.password) {
             return new Response(
-                JSON.stringify({ success: true, msg: '登录成功' }),
+                JSON.stringify({
+                    success: true,
+                    msg: '登录成功',
+                    data: { fullToken: fullToken },
+                }),
                 {
                     status: 200,
                     headers: {

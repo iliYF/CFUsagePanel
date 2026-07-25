@@ -49,9 +49,19 @@ async function generateAdminCookie(adminToken, userAgent) {
 
 /**
  * 生成临时访问 Token（基于 hostname + adminToken + User-Agent 的双重 MD5）。
+ * 仅拥有基础 Scope，API 不会返回资源细节（KV/D1/R2）。
  */
 async function generateTempToken(hostname, adminToken, userAgent) {
     return doubleMD5(hostname + adminToken + userAgent);
+}
+
+/**
+ * 生成完整 Scope Token（基于 adminToken 的双重 MD5）。
+ * 登录后下发给浏览器，可获取含资源细节的完整数据。
+ * 仅依赖密码，永久有效，不受 UA / hostname 变化影响。
+ */
+async function generateFullToken(adminToken) {
+    return doubleMD5(adminToken + 'full_scope_v1');
 }
 
 /**
@@ -76,5 +86,6 @@ export {
     generateAdminToken,
     generateAdminCookie,
     generateTempToken,
+    generateFullToken,
     verifyAdminCookie,
 };
